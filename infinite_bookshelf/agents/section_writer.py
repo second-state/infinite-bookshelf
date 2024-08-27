@@ -31,16 +31,16 @@ def generate_section(
         tokens = chunk.choices[0].delta.content
         if tokens:
             yield tokens
-        if x_groq := chunk.x_groq:
+        if x_groq := getattr(chunk,"x_groq",None):
             if not x_groq.usage:
                 continue
             usage = x_groq.usage
             statistics_to_return = GenerationStatistics(
-                input_time=usage.prompt_time,
-                output_time=usage.completion_time,
+                input_time=getattr(usage,"prompt_time",0),
+                output_time=getattr(usage,"completion_time",0),
                 input_tokens=usage.prompt_tokens,
                 output_tokens=usage.completion_tokens,
-                total_time=usage.total_time,
+                total_time=getattr(usage,"total_time",0),
                 model_name=model,
             )
             yield statistics_to_return

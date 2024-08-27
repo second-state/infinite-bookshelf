@@ -1,6 +1,8 @@
 # 1: Import libraries
 import streamlit as st
-from groq import Groq
+# from groq import Groq
+from openai import Client
+import os
 import json
 
 from infinite_bookshelf.agents import (
@@ -19,19 +21,21 @@ from infinite_bookshelf.ui import Book, load_return_env, ensure_states
 
 
 # 2: Initialize env variables and session states
-GROQ_API_KEY = load_return_env(["GROQ_API_KEY"])["GROQ_API_KEY"]
+# GROQ_API_KEY = load_return_env(["GROQ_API_KEY"])["GROQ_API_KEY"]
+API_KEY = os.getenv("OPENAI_API_KEY", None)
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4-turbo")
 
 states = {
-    "api_key": GROQ_API_KEY,
+    "api_key": API_KEY,
     "button_disabled": False,
     "button_text": "Generate",
     "statistics_text": "",
     "book_title": "",
 }
 
-if GROQ_API_KEY:
-    states["groq"] = (
-        Groq()
+if API_KEY:
+    states["client"] = (
+        Client(api_key=API_KEY)
     )  # Define Groq provider if API key provided. Otherwise defined later after API key is provided.
 
 ensure_states(states)
@@ -85,27 +89,27 @@ try:
             placeholder=placeholder, statistics_text=st.session_state.statistics_text
         )
 
-        if not GROQ_API_KEY:
-            st.session_state.groq = Groq(api_key=groq_input_key)
+        if not API_KEY:
+            st.session_state.client = Client(api_key=groq_input_key)
 
         # Step 1: Generate book structure using structure_writer agent
         large_model_generation_statistics, book_structure = generate_book_structure(
             prompt=topic_text,
             additional_instructions=additional_instructions,
-            model="llama3-70b-8192",
-            groq_provider=st.session_state.groq,
+            model=MODEL_NAME,
+            groq_provider=st.session_state.client,
         )
 
         # Step 2: Generate book title using title_writer agent
         st.session_state.book_title = generate_book_title(
             prompt=topic_text,
-            model="llama3-70b-8192",
-            groq_provider=st.session_state.groq,
+            model=MODEL_NAME,
+            groq_provider=st.session_state.client,
         )
 
         st.write(f"## {st.session_state.book_title}")
 
-        total_generation_statistics = GenerationStatistics(model_name="llama3-8b-8192")
+        total_generation_statistics = GenerationStatistics(model_name=MODEL_NAME)
 
         # Step 3: Generate book section content using section_writer agent
         try:
@@ -126,8 +130,8 @@ try:
                         content_stream = generate_section(
                             prompt=(title + ": " + content),
                             additional_instructions=additional_instructions,
-                            model="llama3-8b-8192",
-                            groq_provider=st.session_state.groq,
+                            model=MODEL_NAME,
+                            groq_provider=st.session_state.client,
                         )
                         for chunk in content_stream:
                             # Check if GenerationStatistics data is returned instead of str tokens
